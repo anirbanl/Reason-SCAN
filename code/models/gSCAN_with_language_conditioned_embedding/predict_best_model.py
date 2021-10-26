@@ -65,8 +65,7 @@ def train(train_data_path: str, val_data_paths: dict, use_cuda: bool, resume_fro
             sos_idx=sos_idx,
             eos_idx=eos_idx,
             input_vocab=train_input_vocab,
-            target_vocab=train_target_vocab,
-            max_examples_to_evaluate=None)
+            target_vocab=train_target_vocab)
         logger.info("Saved predictions to {}".format(output_file))
 
 
