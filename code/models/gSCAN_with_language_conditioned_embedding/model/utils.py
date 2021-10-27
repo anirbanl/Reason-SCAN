@@ -184,15 +184,8 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
                 num_examples += output_sequence.shape[0]
                 logger.info(f"attention_weights_commands shape: {torch.tensor(attention_weights_commands).shape}")
                 logger.info(f"attention_weights_situations shape: {torch.tensor(attention_weights_situations).shape}")
-                logger.info(f"Number of elements in attention_weights_commands: {len(attention_weights_commands)}")
-                logger.info(f"Number of elements in attention_weights_commands[0]: {len(attention_weights_commands[0])}")
 
                 for i in range(output_sequence.shape[0]):
-                    logger.info(f"Entering i: {i}")
-                    logger.info(f"attention_weights_commands shape: {torch.tensor(attention_weights_commands).shape}")
-                    logger.info(f"attention_weights_situations shape: {torch.tensor(attention_weights_situations).shape}")
-                    logger.info(f"Number of elements in attention_weights_commands: {len(attention_weights_commands)}")
-                    logger.info(f"Number of elements in attention_weights_commands[0]: {len(attention_weights_commands[0])}")
                     input_str_sequence, input_start, input_end = array_to_sentence(sentence_array=input_sequence[i].tolist(),
                                                                        vocab=input_vocab, clean=True)
                     target_str_sequence, target_start, target_end = array_to_sentence(sentence_array=target_sequence[i].tolist(),
@@ -204,16 +197,16 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
                     seq_eq.masked_fill_(mask, 0)
                     total = (~mask).sum(-1).float()
                     accuracy = seq_eq.sum(-1) * 100 / total
-                    #attention_weights_commands = torch.tensor(attention_weights_commands)[:, i, :].squeeze(1).tolist()
-                    #attention_weights_situations = torch.tensor(attention_weights_situations)[:, i, :].squeeze(1).tolist()
+                    attention_commands = torch.tensor(attention_weights_commands)[:, i, :].squeeze(1).tolist()
+                    attention_situations = torch.tensor(attention_weights_situations)[:, i, :].squeeze(1).tolist()
 
                     output.append({"input": input_str_sequence[input_start:input_end],
                                    "prediction": output_str_sequence[output_start:output_end],
                                    # "derivation": derivation_spec,
                                    "target": target_str_sequence[target_start:target_end],
                                    "situation": situation[i].tolist(),
-                                   #"attention_weights_input": attention_weights_commands,
-                                   #"attention_weights_situation": attention_weights_situations,
+                                   "attention_weights_input": attention_commands,
+                                   "attention_weights_situation": attention_situations,
                                    "accuracy": accuracy.item(),
                                    "exact_match": True if accuracy == 100 else False})
         logger.info("Wrote predictions for {} examples.".format(num_examples))
