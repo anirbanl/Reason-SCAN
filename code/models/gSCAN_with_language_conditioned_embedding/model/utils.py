@@ -197,8 +197,10 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
                     seq_eq.masked_fill_(mask, 0)
                     total = (~mask).sum(-1).float()
                     accuracy = seq_eq.sum(-1) * 100 / total
-                    attention_commands = torch.tensor(attention_weights_commands)[:, i, :].squeeze(1).tolist()
-                    attention_situations = torch.tensor(attention_weights_situations)[:, i, :].squeeze(1).tolist()
+                    attention_commands = torch.tensor(attention_weights_commands)[:output_end-1, i, :input_end].squeeze(1).tolist()
+                    attention_situations = torch.tensor(attention_weights_situations)[:output_end-1, i, :].squeeze(1).tolist()
+                    logger.info(f"attention_commands shape: {torch.tensor(attention_commands).shape}")
+                    logger.info(f"attention_situations shape: {torch.tensor(attention_situations).shape}")
 
                     output.append({"input": input_str_sequence[input_start:input_end],
                                    "prediction": output_str_sequence[output_start:output_end],
