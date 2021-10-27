@@ -15,7 +15,7 @@ def evaluate(data_iterator, model, max_decoding_steps, pad_idx, sos_idx, eos_idx
     num_examples = 0
     correct_terms = 0
     total_terms = 0
-    for input_sequence, output_sequence, target_sequence, _, _, aux_acc_target in predict(
+    for x, output_sequence, target_sequence, _, _, aux_acc_target in predict(
             data_iterator=data_iterator, model=model, max_decoding_steps=max_decoding_steps, pad_idx=pad_idx,
             sos_idx=sos_idx, eos_idx=eos_idx, max_examples_to_evaluate=max_examples_to_evaluate):
         num_examples += output_sequence.shape[0]
