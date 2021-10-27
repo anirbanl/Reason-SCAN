@@ -176,13 +176,23 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
                     pad_idx=pad_idx, sos_idx=sos_idx,
                     eos_idx=eos_idx):
                 input_sequence = x.input[0]
-                situation = x.situation[0]
+                logger.info(f"Situation type: {type(x.situation)}")
+                logger.info(f"Situation length: {len(x.situation)}")
+                logger.info(f"Situation shape: {x.situation.shape}")
+                situation = x.situation
 
                 num_examples += output_sequence.shape[0]
                 logger.info(f"attention_weights_commands shape: {torch.tensor(attention_weights_commands).shape}")
                 logger.info(f"attention_weights_situations shape: {torch.tensor(attention_weights_situations).shape}")
+                logger.info(f"Number of elements in attention_weights_commands: {len(attention_weights_commands)}")
+                logger.info(f"Number of elements in attention_weights_commands[0]: {len(attention_weights_commands[0])}")
 
                 for i in range(output_sequence.shape[0]):
+                    logger.info(f"Entering i: {i}")
+                    logger.info(f"attention_weights_commands shape: {torch.tensor(attention_weights_commands).shape}")
+                    logger.info(f"attention_weights_situations shape: {torch.tensor(attention_weights_situations).shape}")
+                    logger.info(f"Number of elements in attention_weights_commands: {len(attention_weights_commands)}")
+                    logger.info(f"Number of elements in attention_weights_commands[0]: {len(attention_weights_commands[0])}")
                     input_str_sequence, input_start, input_end = array_to_sentence(sentence_array=input_sequence[i].tolist(),
                                                                        vocab=input_vocab, clean=True)
                     target_str_sequence, target_start, target_end = array_to_sentence(sentence_array=target_sequence[i].tolist(),
