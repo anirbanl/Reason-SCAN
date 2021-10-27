@@ -212,10 +212,10 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
                                    "attention_weights_situation": attention_situations,
                                    "accuracy": accuracy.item(),
                                    "exact_match": True if accuracy == 100 else False})
-                    logger(f"Processed datapoint {i+1}")
+                    logger.info(f"Processed datapoint {i+1}")
                     if accuracy == 100:
                         count_exact_match += 1
-                        logger("EXACT MATCH")
+                        logger.info("EXACT MATCH")
         logger.info("Wrote predictions for {} examples.".format(num_examples))
         logger.info(f"Accuracy in {output_file_path}: {count_exact_match * 100.0/num_examples}")
         json.dump(output, outfile, indent=4)
