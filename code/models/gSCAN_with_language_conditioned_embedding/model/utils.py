@@ -170,6 +170,7 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
         output = []
         with torch.no_grad():
             num_examples = 0
+            count_exact_match = 0
             for (x, output_sequence, target_sequence, attention_weights_commands, attention_weights_situations,
                  auxiliary_accuracy_target) in predict(
                     dataset_iterator, model=model, max_decoding_steps=max_decoding_steps,
@@ -211,7 +212,12 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
                                    "attention_weights_situation": attention_situations,
                                    "accuracy": accuracy.item(),
                                    "exact_match": True if accuracy == 100 else False})
+                    logger(f"Processed datapoint {i+1}")
+                    if accuracy == 100:
+                        count_exact_match += 1
+                        logger("EXACT MATCH")
         logger.info("Wrote predictions for {} examples.".format(num_examples))
+        logger.info(f"Accuracy in {output_file_path}: {count_exact_match * 100.0/num_examples}")
         json.dump(output, outfile, indent=4)
     return output_file_path
 
