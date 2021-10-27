@@ -141,7 +141,7 @@ def sequence_accuracy(prediction: List[int], target: List[int]) -> float:
     return (correct / total) * 100
 
 
-def array_to_sentence(self, sentence_array, vocab):
+def array_to_sentence(sentence_array, vocab):
     return [vocab.itos[word_idx] for word_idx in sentence_array]
 
 
@@ -161,32 +161,38 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
     with open(output_file_path, mode='w') as outfile:
         output = []
         with torch.no_grad():
-            i = 0
-            for (x, output_sequence, attention_weights_commands, attention_weights_situations,
+            num_examples = 0
+            for (input_sequence, output_sequence, target_sequence, attention_weights_commands, attention_weights_situations,
                  auxiliary_accuracy_target) in predict(
                     dataset_iterator, model=model, max_decoding_steps=max_decoding_steps,
                     pad_idx=pad_idx, sos_idx=sos_idx,
                     eos_idx=eos_idx):
-                i += 1
-                input_sequence = x.input
-                target_sequence = x.target
 
-                accuracy = sequence_accuracy(output_sequence, target_sequence[0].tolist()[1:-1])
-                input_str_sequence = array_to_sentence(input_sequence[0].tolist(), vocab=input_vocab)
-                input_str_sequence = input_str_sequence[1:-1]  # Get rid of <SOS> and <EOS>
-                target_str_sequence = array_to_sentence(target_sequence[0].tolist(), vocab=target_vocab)
-                target_str_sequence = target_str_sequence[1:-1]  # Get rid of <SOS> and <EOS>
-                output_str_sequence = array_to_sentence(output_sequence, vocabulary="target")
-                output.append({"input": input_str_sequence, "prediction": output_str_sequence,
-                               # "derivation": derivation_spec,
-                               "target": target_str_sequence,
-                               # "situation": situation_spec,
-                               "attention_weights_input": attention_weights_commands,
-                               "attention_weights_situation": attention_weights_situations,
-                               "accuracy": accuracy,
-                               "exact_match": True if accuracy == 100 else False,
-                               "position_accuracy": auxiliary_accuracy_target})
-        logger.info("Wrote predictions for {} examples.".format(i))
+                num_examples += output_sequence.shape[0]
+                logger.info(f"attention_weights_commands shape: {torch.tensor(attention_weights_commands).shape}")
+                logger.info(f"attention_weights_situations shape: {torch.tensor(attention_weights_situations).shape}")
+
+                for i in range(output_sequence.shape[0]):
+                    input_str_sequence = array_to_sentence(sentence_array=input_sequence[i].tolist(), vocab=input_vocab)
+                    target_str_sequence = array_to_sentence(sentence_array=target_sequence[i].tolist(), vocab=target_vocab)
+                    output_str_sequence = array_to_sentence(sentence_array=output_sequence[i].tolist(), vocab=target_vocab)
+                    seq_eq = torch.eq(output_sequence[i], target_sequence[i])
+                    mask = torch.eq(target_sequence[i], pad_idx) + torch.eq(target_sequence[i], sos_idx)
+                    seq_eq.masked_fill_(mask, 0)
+                    total = (~mask).sum(-1).float()
+                    accuracy = seq_eq.sum(-1) * 100 / total
+                    attention_weights_commands = torch.tensor(attention_weights_commands)[:, i, :].squeeze(1).tolist()
+                    attention_weights_situations = torch.tensor(attention_weights_situations)[:, i, :].squeeze(1).tolist()
+
+                    output.append({"input": input_str_sequence, "prediction": output_str_sequence,
+                                   # "derivation": derivation_spec,
+                                   "target": target_str_sequence,
+                                   # "situation": situation_spec,
+                                   "attention_weights_input": attention_weights_commands,
+                                   "attention_weights_situation": attention_weights_situations,
+                                   "accuracy": accuracy,
+                                   "exact_match": True if accuracy == 100 else False})
+        logger.info("Wrote predictions for {} examples.".format(num_examples))
         json.dump(output, outfile, indent=4)
     return output_file_path
 
@@ -239,6 +245,7 @@ def predict(data_iterator: Iterator, model: nn.Module, max_decoding_steps: int, 
         attention_weights_situations = []
 
         real_decoding_steps = min(max_decoding_steps, x.target[0].shape[1] - 1)
+        logger.info(f"real_decoding_steps: {real_decoding_steps}")
         while decoding_iteration < real_decoding_steps:
             (output, hidden, context_situation, attention_weights_command,
              attention_weights_situation) = model.decoder.attentionDecoder.forward_step(
@@ -253,13 +260,32 @@ def predict(data_iterator: Iterator, model: nn.Module, max_decoding_steps: int, 
             contexts_situation.append(context_situation.unsqueeze(1))
             decoding_iteration += 1
 
+        logger.info(f"decoding_iteration: {decoding_iteration}")
+        logger.info(f"Number of elements in attention_weights_commands: {len(attention_weights_commands)}")
+        logger.info(f"Number of elements in attention_weights_commands[0]: {len(attention_weights_commands[0])}")
+        logger.info(f"Number of elements in attention_weights_commands[{real_decoding_steps-1}]: {len(attention_weights_commands[real_decoding_steps-1])}")
+        logger.info(f"Shape of attention_weights_commands[{real_decoding_steps-1}][0]: {len(attention_weights_commands[real_decoding_steps-1][0])}")
+        logger.info(f"attention_weights_commands shape: {torch.tensor(attention_weights_commands).shape}")
+        logger.info(f"Number of elements in attention_weights_situations: {len(attention_weights_situations)}")
+        logger.info(f"Number of elements in attention_weights_situations[0]: {len(attention_weights_situations[0])}")
+        logger.info(f"Number of elements in attention_weights_situations[{real_decoding_steps-1}]: {len(attention_weights_situations[real_decoding_steps-1])}")
+        logger.info(f"Shape of attention_weights_situations[{real_decoding_steps-1}][0]: {len(attention_weights_situations[real_decoding_steps-1][0])}")
+        logger.info(f"attention_weights_situations shape: {torch.tensor(attention_weights_situations).shape}")
         if model.auxiliary_task:
             target_position_scores = model.auxiliary_task_forward(torch.cat(contexts_situation, dim=1).sum(dim=1))
             auxiliary_accuracy_target = model.get_auxiliary_accuracy(target_position_scores,
                                                                      x.target)
         else:
             auxiliary_accuracy_target = 0
-        yield (x, output_tokens, x.target[0][:, :real_decoding_steps + 1], attention_weights_commands,
+        logger.info(f"Shape of x.input[0]: {x.input[0].shape}")
+        logger.info(f"First input sequence: {x.input[0][0].shape}, {x.input[0][0]}")
+        logger.info(f"Shape of x.target[0]: {x.target[0].shape}")
+        logger.info(f"Shape of x.target[0][:, :{real_decoding_steps + 1}]: {x.target[0][:, :real_decoding_steps + 1].shape}")
+        logger.info(f"First target sequence: {x.target[0][0].shape}, {x.target[0][0]}")
+        logger.info(f"First predicted sequence: {output_tokens[0].shape}, {output_tokens[0]}")
+        logger.info(f"attention_weights_commands shape: {torch.tensor(attention_weights_commands).shape}")
+        logger.info(f"attention_weights_situations shape: {torch.tensor(attention_weights_situations).shape}")
+        yield (x.input[0], output_tokens, x.target[0][:, :real_decoding_steps + 1], attention_weights_commands,
                attention_weights_situations, auxiliary_accuracy_target)
 
     elapsed_time = time.time() - start_time

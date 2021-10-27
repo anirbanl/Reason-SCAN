@@ -60,8 +60,8 @@ def train(train_data_path: str, val_data_paths: dict, use_cuda: bool, resume_fro
         logger.info(f"Output file path: {output_file_path}")
         output_file = predict_and_save(
             val_iter, model=model,
-            output_file_path = output_file_path,
-            max_decoding_steps=120, pad_idx=pad_idx,
+            output_file_path=output_file_path,
+            max_decoding_steps=30, pad_idx=pad_idx,
             sos_idx=sos_idx,
             eos_idx=eos_idx,
             input_vocab=train_input_vocab,
