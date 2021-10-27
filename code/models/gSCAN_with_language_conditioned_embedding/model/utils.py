@@ -141,8 +141,16 @@ def sequence_accuracy(prediction: List[int], target: List[int]) -> float:
     return (correct / total) * 100
 
 
-def array_to_sentence(sentence_array, vocab):
-    return [vocab.itos[word_idx] for word_idx in sentence_array]
+def array_to_sentence(sentence_array, vocab, clean=False):
+    s = [vocab.itos[word_idx] for word_idx in sentence_array]
+    start = 0
+    if clean:
+        for i, w in enumerate(s):
+            if w == '<sos>':
+                start = i+1
+            elif w in ['<pad>', '<eos>']:
+                return s, start, i
+    return s, start, len(s)
 
 
 def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_steps, pad_idx, sos_idx, eos_idx,
@@ -173,9 +181,12 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
                 logger.info(f"attention_weights_situations shape: {torch.tensor(attention_weights_situations).shape}")
 
                 for i in range(output_sequence.shape[0]):
-                    input_str_sequence = array_to_sentence(sentence_array=input_sequence[i].tolist(), vocab=input_vocab)
-                    target_str_sequence = array_to_sentence(sentence_array=target_sequence[i].tolist(), vocab=target_vocab)
-                    output_str_sequence = array_to_sentence(sentence_array=output_sequence[i].tolist(), vocab=target_vocab)
+                    input_str_sequence, input_start, input_end = array_to_sentence(sentence_array=input_sequence[i].tolist(),
+                                                                       vocab=input_vocab, clean=True)
+                    target_str_sequence, target_start, target_end = array_to_sentence(sentence_array=target_sequence[i].tolist(),
+                                                                        vocab=target_vocab, clean=True)
+                    output_str_sequence, output_start, output_end = array_to_sentence(sentence_array=output_sequence[i].tolist(),
+                                                                        vocab=target_vocab, clean=True)
                     seq_eq = torch.eq(output_sequence[i], target_sequence[i])
                     mask = torch.eq(target_sequence[i], pad_idx) + torch.eq(target_sequence[i], sos_idx)
                     seq_eq.masked_fill_(mask, 0)
@@ -184,13 +195,14 @@ def predict_and_save(dataset_iterator, model, output_file_path, max_decoding_ste
                     attention_weights_commands = torch.tensor(attention_weights_commands)[:, i, :].squeeze(1).tolist()
                     attention_weights_situations = torch.tensor(attention_weights_situations)[:, i, :].squeeze(1).tolist()
 
-                    output.append({"input": input_str_sequence, "prediction": output_str_sequence,
+                    output.append({"input": input_str_sequence[input_start:input_end],
+                                   "prediction": output_str_sequence[output_start:output_end],
                                    # "derivation": derivation_spec,
-                                   "target": target_str_sequence,
+                                   "target": target_str_sequence[target_start:target_end],
                                    # "situation": situation_spec,
                                    "attention_weights_input": attention_weights_commands,
                                    "attention_weights_situation": attention_weights_situations,
-                                   "accuracy": accuracy,
+                                   "accuracy": accuracy.item(),
                                    "exact_match": True if accuracy == 100 else False})
         logger.info("Wrote predictions for {} examples.".format(num_examples))
         json.dump(output, outfile, indent=4)
